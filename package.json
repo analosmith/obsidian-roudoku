@@ -1,0 +1,40 @@
+{
+  "name": "obsidian-roudoku",
+  "version": "0.0.4",
+  "private": true,
+  "type": "module",
+  "description": "Japanese note narration: device verification build",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc --noEmit && node esbuild.config.mjs",
+    "test": "vitest run",
+    "lint": "eslint src --max-warnings=0",
+    "lint:secrets": "node scripts/check-secrets.mjs",
+    "check": "npm run test && npm run lint && npm run lint:secrets && npm run build",
+    "package": "npm run check && node scripts/package.mjs",
+    "format": "prettier --write src tests scripts *.mjs *.json styles.css",
+    "format:check": "prettier --check src tests scripts *.mjs *.json styles.css"
+  },
+  "dependencies": {
+    "remark-frontmatter": "^5.0.0",
+    "remark-gfm": "^4.0.0",
+    "remark-parse": "^11.0.0",
+    "unified": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/mdast": "^4.0.4",
+    "@types/node": "^22.15.17",
+    "esbuild": "^0.25.5",
+    "eslint": "^9.39.4",
+    "eslint-plugin-obsidianmd": "^0.4.0",
+    "globals": "^17.6.0",
+    "obsidian": "latest",
+    "prettier": "^3.9.6",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.59.1",
+    "vitest": "^3.2.0"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

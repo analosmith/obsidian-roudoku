@@ -1,0 +1,7 @@
+node_modules/
+dist/
+coverage/
+main.js
+.DS_Store
+.env
+.env.*
