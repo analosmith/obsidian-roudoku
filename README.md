@@ -78,3 +78,11 @@ The package command validates the source and creates release assets in `dist/rou
 ## License and credits
 
 MIT License. Architecture ideas were informed by [Obsidian Voice](https://github.com/chrisurf/obsidian-voice). This plugin's text processing, playback, settings, and provider implementation were written independently. Build and lint configuration was informed by the official Obsidian sample plugin.
+
+## 0.0.5 — automatic sentence-length recovery
+
+When Google rejects a request because a sentence is too long, Roudoku retries that segment as separate sentences, then splits only the fragments that still fail. Text order and content are preserved. Recovery is limited to four splitting levels, 32 synthesis attempts and 60 seconds of cumulative synthesis waiting per original segment. Playback time is excluded. Additional API calls may incur charges.
+
+Stopping or changing segments cancels further retries and discards late audio. After a failure, the play button retries the failed fragment without replaying completed fragments. Authentication, quota and other unrelated errors do not trigger sentence splitting.
+
+Validated with 47 automated tests and a Mac playback check; the user also confirmed the fix works. Full long-note playback, Android/iPad and background playback are not comprehensively verified.
