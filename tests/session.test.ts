@@ -84,3 +84,19 @@ describe("persistent playback session", () => {
     expect(p.start).toHaveBeenCalledOnce();
   });
 });
+it("routes the error play button to the current fragment retry", () => {
+  const session = new PlaybackSession(),
+    player = fake();
+  player.retry = vi.fn();
+  session.start(player, ["a", "b"], "Note", "Google Cloud", 1);
+  player.onChange({
+    state: "error",
+    completed: 1,
+    total: 2,
+    message: "failed",
+  });
+  session.toggle();
+  expect(player.retry).toHaveBeenCalledOnce();
+  expect(player.start).toHaveBeenCalledOnce();
+  expect(session.snapshot.completed).toBe(1);
+});

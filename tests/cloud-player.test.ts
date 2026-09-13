@@ -1,3 +1,4 @@
+import { beforeEach } from "vitest";
 import { describe, it, expect, vi } from "vitest";
 import { CloudPlayer, type Clip } from "../src/cloud-player";
 const deferred = <T>() => {
@@ -24,9 +25,7 @@ function fakeClip() {
   };
 }
 const flush = async () => {
-  await Promise.resolve();
-  await Promise.resolve();
-  await Promise.resolve();
+  for (let i = 0; i < 20; i++) await Promise.resolve();
 };
 describe("cloud session lifecycle", () => {
   it("discards a late response after stop", async () => {
@@ -96,4 +95,8 @@ describe("cloud session lifecycle", () => {
     await flush();
     expect(p.snapshot.state).toBe("playing");
   });
+});
+
+beforeEach(() => {
+  vi.stubGlobal("window", globalThis);
 });
