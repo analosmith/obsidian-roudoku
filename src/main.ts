@@ -12,7 +12,12 @@ import {
   Platform,
   type App,
 } from "obsidian";
-import { chunkText, markdownToText, ssmlChunks } from "./text";
+import {
+  chunkText,
+  markdownToText,
+  ssmlChunks,
+  splitSsmlForRetry,
+} from "./text";
 import { CloudPlayer } from "./cloud-player";
 import { SystemPlayer, type SpeechPort } from "./system-player";
 import { audioClip, synthesizeGoogle, GOOGLE_VOICES } from "./google";
@@ -250,22 +255,32 @@ export default class Roudoku extends Plugin {
     if (provider === "google" && credential.key) {
       const key = credential.key,
         voice = this.settings.googleVoice;
-      player = new CloudPlayer(async (content) =>
-        audioClip(
-          await synthesizeGoogle(content, key, voice, async (body, apiKey) => {
-            const response = await requestUrl({
-              url: "https://texttospeech.googleapis.com/v1/text:synthesize",
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "X-Goog-Api-Key": apiKey,
+      player = new CloudPlayer(
+        async (content) =>
+          audioClip(
+            await synthesizeGoogle(
+              content,
+              key,
+              voice,
+              async (body, apiKey) => {
+                const response = await requestUrl({
+                  url: "https://texttospeech.googleapis.com/v1/text:synthesize",
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "X-Goog-Api-Key": apiKey,
+                  },
+                  body: JSON.stringify(body),
+                  throw: false,
+                });
+                return {
+                  status: response.status,
+                  json: response.json as unknown,
+                };
               },
-              body: JSON.stringify(body),
-              throw: false,
-            });
-            return { status: response.status, json: response.json as unknown };
-          }),
-        ),
+            ),
+          ),
+        splitSsmlForRetry,
       );
       chunks = ssmlChunks(text, 1800);
     } else {

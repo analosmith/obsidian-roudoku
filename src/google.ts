@@ -42,7 +42,12 @@ export async function synthesizeGoogle(
       "APIの利用上限に達しました。時間を置いて再試行してください。",
     );
   if (response.status !== 200)
-    throw new NarrationError(googleFailure(response.status, response.json));
+    throw new NarrationError(
+      googleFailure(response.status, response.json),
+      response.status === 400 && isSentenceTooLong(response.json)
+        ? "sentence-too-long"
+        : undefined,
+    );
   const json = response.json;
   if (
     !json ||
@@ -118,4 +123,17 @@ export function googleFailure(status: number, json: unknown): string {
   else if (/input.*(long|limit|size)|bytes|characters.*limit/i.test(message))
     reason = "文章の長さが音声APIの上限を超えています。";
   return reason + "（HTTP " + status + "）";
+}
+
+/** Inspect only the expected upstream message; never expose it to the UI. */
+export function isSentenceTooLong(json: unknown): boolean {
+  if (!json || typeof json !== "object" || !("error" in json)) return false;
+  const error = json.error;
+  return (
+    !!error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string" &&
+    /sentenc[es]*.*too long|too long.*sentenc/i.test(error.message)
+  );
 }

@@ -75,6 +75,8 @@ export class PlaybackSession {
     if (this.snapshot.state === "paused") this.player?.resume();
     else if (["playing", "loading"].includes(this.snapshot.state))
       this.player?.pause();
+    else if (this.snapshot.state === "error" && this.player?.retry)
+      this.player.retry();
     else if (this.player) this.playFrom(0);
   }
   setRate(rate: number): void {

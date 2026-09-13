@@ -12,6 +12,7 @@ export interface Player {
   start(chunks: string[]): void;
   pause(): void;
   resume(): void;
+  retry?(): void;
   stop(): void;
   setRate(rate: number): void;
 }

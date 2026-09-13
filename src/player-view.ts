@@ -101,7 +101,9 @@ export function mountControls(
         ? "再開"
         : s.state === "idle"
           ? "このノートを再生"
-          : "先頭から再生";
+          : s.state === "error" && s.provider === "Google Cloud"
+            ? "失敗した位置から再試行"
+            : "先頭から再生";
     play.setAttribute("aria-label", label);
     play.title = label;
     stop.disabled = s.state === "idle";
@@ -160,7 +162,7 @@ export class RoudokuPlayerView extends ItemView {
     });
     el.createEl("p", {
       cls: "roudoku-muted",
-      text: "進捗は読み終えた区間数です。区間送りはその区間から再生します。Googleでは再合成のAPI料金が発生します。",
+      text: "進捗は読み終えた区間数です。区間送りはその区間から再生します。Googleでは再合成のAPI料金が発生します。文の長さで拒否された場合は自動で短く分けて再試行します。",
     });
     new Setting(el)
       .setName("接続できないとき")

@@ -132,3 +132,39 @@ export function ssmlChunks(text: string, maxBytes = 4800): string[] {
   if (current) chunks.push(wrap(current));
   return chunks;
 }
+
+/** Only accepts the SSML shape generated above. Never slices XML or entities. */
+export function splitSsmlForRetry(ssml: string): string[] {
+  const wrap = (value: string) => "<speak>" + value + "</speak>";
+  const inner = ssml.slice(7, -8);
+  if (!ssml.startsWith("<speak>") || !ssml.endsWith("</speak>")) return [];
+  const elements = inner.match(/<s>[\s\S]*?<\/s>/g) ?? [];
+  if (elements.join("") !== inner || !elements.length) return [];
+  if (elements.length > 1) return elements.map(wrap);
+  const encoded = inner.slice(3, -4);
+  const text = encoded
+    .replaceAll('<break time="300ms"/>', "\n")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&amp;", "&");
+  // Reject anything outside our own encoder's output.
+  if (escaped(text) !== encoded) return [];
+  const points = Array.from(text);
+  if (points.length < 2) return [];
+  const midpoint = Math.floor(points.length / 2);
+  let cut = midpoint;
+  const candidates: number[] = [];
+  for (
+    let i = Math.max(1, Math.floor(points.length / 4));
+    i <= Math.min(points.length - 1, Math.ceil((points.length * 3) / 4));
+    i++
+  ) {
+    if (/[、，,;；：:\s。！？.!?]/u.test(points[i - 1] ?? ""))
+      candidates.push(i);
+  }
+  candidates.sort((a, b) => Math.abs(a - midpoint) - Math.abs(b - midpoint));
+  cut = candidates[0] ?? cut;
+  return [points.slice(0, cut).join(""), points.slice(cut).join("")].map(
+    (piece) => wrap("<s>" + escaped(piece) + "</s>"),
+  );
+}
