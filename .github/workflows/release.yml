@@ -1,0 +1,60 @@
+name: Release
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Test and package
+        run: npm run package && npm run format:check
+      - name: Validate release version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          version=$(node -p 'JSON.parse(require("fs").readFileSync("manifest.json", "utf8")).version')
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          node --input-type=module -e 'import fs from "node:fs"; const m = JSON.parse(fs.readFileSync("manifest.json")); const p = JSON.parse(fs.readFileSync("package.json")); if (m.version !== p.version) process.exit(1);'
+          if gh release view "$version" >/dev/null 2>&1; then
+            echo 'Release already exists; refusing to overwrite.' >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Attest all three plugin files
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/roudoku/*
+      - name: Verify provenance before publishing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for asset in dist/roudoku/*; do
+            gh attestation verify "$asset" --repo "$GITHUB_REPOSITORY"
+          done
+      - name: Publish release from this exact commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "$RELEASE_VERSION" dist/roudoku/main.js dist/roudoku/manifest.json dist/roudoku/styles.css --target "$GITHUB_SHA" --title "Roudoku $RELEASE_VERSION" --notes-file RELEASE_NOTES.md --latest
