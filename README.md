@@ -18,20 +18,20 @@ A sidebar player and a compact playback bar let you keep reading while you liste
 
 Obsidian **1.11.5 or later** is required. Development testing used Obsidian 1.13.7 on Mac and iPhone. Android and iPad have not been tested.
 
-This release is not yet listed in Obsidian's community plugin directory.
+Install **Roudoku** from [the community plugin listing](https://community.obsidian.md/plugins/roudoku), or use the manual steps below.
 
 1. Download `main.js`, `manifest.json`, and `styles.css` from the GitHub Release.
 2. Create `<your-vault>/.obsidian/plugins/roudoku/` and put the three files there.
-3. Reload Obsidian and enable **朗読** in Settings → Community plugins.
+3. Reload Obsidian and enable **Roudoku** in Settings → Community plugins.
 4. For Obsidian Sync, enable plugin synchronization on both devices, wait for synchronization, and reload the plugin on the receiving device.
 
 ## Google Cloud setup
 
 1. Enable the Cloud Text-to-Speech API and billing in your Google Cloud project, then create an API key with appropriate API restrictions.
-2. In Obsidian Settings → 朗読, create or select a SecretStorage entry for your Google API key. Register credentials separately on each device.
+2. In Obsidian Settings → Roudoku, create or select a SecretStorage entry for your Google API key. Register credentials separately on each device.
 3. Use the connection check to fetch Google's Japanese voice list. This does not synthesize speech or guarantee synthesis will succeed.
 4. Open the player using the waveform ribbon icon or the **プレイヤーを開く** command. Select **Google Cloud**.
-5. Open a note and choose **このノートを読み上げ** from the ribbon or command palette. A sample playback button is also available in Settings → 朗読.
+5. Open a note and choose **このノートを読み上げ** from the ribbon or command palette. A sample playback button is also available in Settings → Roudoku.
 
 The default provider is device speech. Choose Google Cloud in the player to use cloud voices.
 On mobile, the player is accessible through Obsidian's standard right sidebar. Tap the note title in the compact bar to return to the player.

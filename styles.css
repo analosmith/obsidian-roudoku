@@ -160,10 +160,10 @@
   padding: 10px 12px;
   gap: 0 6px;
 }
-.workspace:has(.roudoku-mini:not(.is-hidden)) .markdown-preview-sizer {
-  padding-bottom: 160px !important;
+.workspace.roudoku-has-mini .markdown-preview-sizer {
+  margin-bottom: 160px;
 }
-.workspace:has(.roudoku-mini:not(.is-hidden)) .cm-scroller {
+.workspace.roudoku-has-mini .cm-scroller {
   scroll-padding-bottom: 160px;
 }
 @media (max-width: 360px) {
