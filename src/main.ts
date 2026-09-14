@@ -11,6 +11,7 @@ import {
   apiVersion,
   Platform,
   type App,
+  type SettingDefinitionItem,
 } from "obsidian";
 import {
   chunkText,
@@ -118,8 +119,14 @@ export default class Roudoku extends Plugin {
       );
       const mini = this.app.workspace.containerEl.createDiv();
       const unsubscribe = mountControls(mini, this, true);
+      const workspace = this.app.workspace.containerEl;
+      const unsubscribeLayout = this.session.subscribe((snapshot) => {
+        workspace.toggleClass("roudoku-has-mini", snapshot.state !== "idle");
+      });
       this.register(() => {
         unsubscribe();
+        unsubscribeLayout();
+        workspace.removeClass("roudoku-has-mini");
         mini.remove();
       });
     });
@@ -291,126 +298,166 @@ export default class Roudoku extends Plugin {
     this.session.start(player, chunks, title, label, this.settings.speed);
   }
 }
-class RoudokuSettings extends PluginSettingTab {
+type SettingsRow = {
+  name: string;
+  desc?: string;
+  aliases?: string[];
+  render: (setting: Setting) => void;
+};
+export class RoudokuSettings extends PluginSettingTab {
   constructor(
     app: App,
     private readonly plugin: Roudoku,
   ) {
     super(app, plugin);
   }
+  getSettingDefinitions(): SettingDefinitionItem[] {
+    return this.rows();
+  }
+  // Obsidian before 1.13 calls display instead of the declarative API.
   display(): void {
-    const el = this.containerEl;
-    el.empty();
-    el.addClass("roudoku");
-    new Setting(el)
-      .setName(`朗読 ${this.plugin.manifest.version}`)
-      .setHeading();
-    el.createEl("p", {
-      text: "対応するクラウド音声サービスはGoogle Cloudのみです。ご自身のAPIキーを登録して利用します。",
-    });
-    el.createEl("p", {
-      text: "Googleでの読み上げは本文をGoogleへ送信し、API利用料金が発生します。キー未登録・オフライン時には、端末の標準音声を代替として利用できます。",
-    });
-    const keyStatus = loadGoogleKey(
-      this.app.secretStorage,
-      this.plugin.settings.googleSecretName,
-    );
-    new Setting(el).setName("Googleの音声").addDropdown((d) => {
-      for (const name of GOOGLE_VOICES)
-        d.addOption(name, name.replace("ja-JP-Chirp3-HD-", ""));
-      d.setValue(this.plugin.settings.googleVoice).onChange((value) => {
-        this.plugin.settings.googleVoice = value;
-        this.plugin.persist();
-      });
-    });
-    if (keyStatus.state !== "unavailable") {
-      new Setting(el)
-        .setName("GoogleのAPIキー")
-        .setDesc(
-          "SecretStorageのキーを作成・選択します。キー本体は端末ごとに登録します。",
-        )
-        .addComponent((container) =>
-          new SecretComponent(this.app, container)
-            .setValue(this.plugin.settings.googleSecretName)
-            .onChange((value) => {
-              this.plugin.settings.googleSecretName = value ?? "";
-              this.plugin.persist();
-            }),
-        );
-    } else {
-      el.createEl("p", {
-        text: "SecretStorageを使えません。APIキーの平文保存には対応していません。標準音声を使用できます。",
-      });
+    this.containerEl.empty();
+    this.containerEl.addClass("roudoku");
+    for (const row of this.rows()) {
+      row.render(
+        new Setting(this.containerEl).setName(row.name).setDesc(row.desc ?? ""),
+      );
     }
-    new Setting(el)
-      .setName("キーの接続確認")
-      .setDesc("Googleの音声一覧を取得します。文章の合成は行いません。")
-      .addButton((b) =>
-        b.setButtonText("接続確認").onClick(async () => {
-          b.setDisabled(true);
-          try {
-            const current = loadGoogleKey(
+  }
+  private rows(): SettingsRow[] {
+    return [
+      {
+        name: `朗読 ${this.plugin.manifest.version}`,
+        desc: "対応するクラウド音声サービスはGoogle Cloudのみです。ご自身のAPIキーを登録して利用します。Googleでの読み上げは本文をGoogleへ送信し、API利用料金が発生します。キー未登録・オフライン時には、端末の標準音声を代替として利用できます。",
+        render: (setting) => {
+          setting.setHeading();
+        },
+      },
+      {
+        name: "Googleの音声",
+        aliases: ["voice", "Google Cloud", "Chirp"],
+        render: (setting) => {
+          setting.addDropdown((d) => {
+            for (const name of GOOGLE_VOICES)
+              d.addOption(name, name.replace("ja-JP-Chirp3-HD-", ""));
+            d.setValue(this.plugin.settings.googleVoice).onChange((value) => {
+              this.plugin.settings.googleVoice = value;
+              this.plugin.persist();
+            });
+          });
+        },
+      },
+      {
+        name: "GoogleのAPIキー",
+        aliases: ["API key", "SecretStorage"],
+        desc: "SecretStorageのキーを作成・選択します。キー本体は端末ごとに登録します。",
+        render: (setting) => {
+          if (
+            loadGoogleKey(
+              this.app.secretStorage,
+              this.plugin.settings.googleSecretName,
+            ).state === "unavailable"
+          ) {
+            setting.setDesc(
+              "SecretStorageを使えません。APIキーの平文保存には対応していません。標準音声を使用できます。",
+            );
+            return;
+          }
+          setting.addComponent((container) =>
+            new SecretComponent(this.app, container)
+              .setValue(this.plugin.settings.googleSecretName)
+              .onChange((value) => {
+                this.plugin.settings.googleSecretName = value ?? "";
+                this.plugin.persist();
+              }),
+          );
+        },
+      },
+      {
+        name: "キーの接続確認",
+        aliases: ["connection", "API"],
+        desc: "Googleの音声一覧を取得します。文章の合成は行いません。",
+        render: (setting) => {
+          setting.addButton((b) =>
+            b.setButtonText("接続確認").onClick(async () => {
+              b.setDisabled(true);
+              try {
+                const current = loadGoogleKey(
+                  this.app.secretStorage,
+                  this.plugin.settings.googleSecretName,
+                );
+                if (!current.key) {
+                  new Notice("Googleのキーを登録・選択してください。");
+                  return;
+                }
+                const response = await requestUrl({
+                  url: "https://texttospeech.googleapis.com/v1/voices?languageCode=ja-JP",
+                  headers: { "X-Goog-Api-Key": current.key },
+                  throw: false,
+                });
+                new Notice(
+                  response.status === 200
+                    ? "音声一覧へ接続できました。合成の可否は設定の例文再生で確認してください。"
+                    : `接続できませんでした（HTTP ${response.status}）。キーと権限を確認してください。`,
+                );
+              } catch {
+                new Notice(
+                  "接続できませんでした。ネットワークを確認してください。",
+                );
+              } finally {
+                b.setDisabled(false);
+              }
+            }),
+          );
+        },
+      },
+      {
+        name: "プレイヤー",
+        aliases: ["player"],
+        render: (setting) => {
+          setting.addButton((b) =>
+            b.setButtonText("開く").onClick(() => this.plugin.openPlayer()),
+          );
+        },
+      },
+      {
+        name: "動作確認",
+        aliases: ["sample", "再生"],
+        desc: "Google選択時は文章を送信し、API利用料金が発生します。",
+        render: (setting) => {
+          setting.addButton((b) =>
+            b
+              .setButtonText("例文を再生")
+              .onClick(() => this.plugin.startText(SAMPLE, "動作確認の例文")),
+          );
+        },
+      },
+      {
+        name: "端末診断",
+        aliases: ["diagnostic", "SecretStorage"],
+        desc: "キーの値やノート本文は表示しません。再起動後も取得成功になるか確認します。",
+        render: (setting) => {
+          const update = () => {
+            const key = loadGoogleKey(
               this.app.secretStorage,
               this.plugin.settings.googleSecretName,
             );
-            if (!current.key) {
-              new Notice("Googleのキーを登録・選択してください。");
-              return;
-            }
-            const response = await requestUrl({
-              url: "https://texttospeech.googleapis.com/v1/voices?languageCode=ja-JP",
-              headers: { "X-Goog-Api-Key": current.key },
-              throw: false,
-            });
-            new Notice(
-              response.status === 200
-                ? "音声一覧へ接続できました。合成の可否は設定の例文再生で確認してください。"
-                : `接続できませんでした（HTTP ${response.status}）。キーと権限を確認してください。`,
+            const states = {
+              available: "取得成功",
+              missing: "未登録",
+              unavailable: "利用不可",
+              error: "取得失敗",
+            };
+            setting.setDesc(
+              `Obsidian ${apiVersion} / ${Platform.isMobile ? "モバイル" : "デスクトップ"} / SecretStorage: ${states[key.state]} / 日本語音声: ${window.speechSynthesis?.getVoices().filter((v) => v.lang.startsWith("ja")).length ?? 0}件。キーの値やノート本文は表示しません。`,
             );
-          } catch {
-            new Notice(
-              "接続できませんでした。ネットワークを確認してください。",
-            );
-          } finally {
-            b.setDisabled(false);
-          }
-        }),
-      );
-    new Setting(el)
-      .setName("プレイヤー")
-      .addButton((b) =>
-        b.setButtonText("開く").onClick(() => this.plugin.openPlayer()),
-      );
-    new Setting(el)
-      .setName("動作確認")
-      .setDesc("Google選択時は文章を送信し、API利用料金が発生します。")
-      .addButton((b) =>
-        b
-          .setButtonText("例文を再生")
-          .onClick(() => this.plugin.startText(SAMPLE, "動作確認の例文")),
-      );
-    const diagnostic = el.createEl("p", { cls: "roudoku-muted" });
-    const update = () => {
-      const key = loadGoogleKey(
-        this.app.secretStorage,
-        this.plugin.settings.googleSecretName,
-      );
-      const states = {
-        available: "取得成功",
-        missing: "未登録",
-        unavailable: "利用不可",
-        error: "取得失敗",
-      };
-      diagnostic.setText(
-        `Obsidian ${apiVersion} / ${Platform.isMobile ? "モバイル" : "デスクトップ"} / SecretStorage: ${states[key.state]} / 日本語音声: ${window.speechSynthesis?.getVoices().filter((v) => v.lang.startsWith("ja")).length ?? 0}件`,
-      );
-    };
-    new Setting(el)
-      .setName("端末診断")
-      .setDesc(
-        "キーの値やノート本文は表示しません。再起動後も取得成功になるか確認します。",
-      )
-      .addButton((b) => b.setButtonText("診断を更新").onClick(update));
-    update();
+          };
+          setting.addButton((b) =>
+            b.setButtonText("診断を更新").onClick(update),
+          );
+          update();
+        },
+      },
+    ];
   }
 }
