@@ -1,9 +1,9 @@
 {
   "id": "roudoku",
-  "name": "朗読",
-  "version": "0.0.5",
+  "name": "Roudoku",
+  "version": "0.0.6",
   "minAppVersion": "1.11.5",
-  "description": "Google Cloudの音声で日本語ノートを朗読。標準音声の代替再生にも対応。",
+  "description": "Read Japanese notes aloud with Google Cloud text-to-speech, a sidebar player, and device speech fallback.",
   "author": "TAKE",
   "isDesktopOnly": false
 }
