@@ -168,3 +168,13 @@ export function splitSsmlForRetry(ssml: string): string[] {
     (piece) => wrap("<s>" + escaped(piece) + "</s>"),
   );
 }
+
+/** Decode only the SSML produced by this module for a matching transcript. */
+export function spokenText(ssml: string): string {
+  return ssml
+    .replace(/<\/?(?:speak|s)>/g, "")
+    .replaceAll('<break time="300ms"/>', "\n")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&amp;", "&");
+}

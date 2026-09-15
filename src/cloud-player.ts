@@ -4,6 +4,8 @@ import {
   type Player,
   type Snapshot,
 } from "./player";
+type Budget = { attempts: number; ms: number };
+type Prepared = { clip: Clip } | { error: unknown };
 export interface Clip {
   play(): Promise<void>;
   pause(): void;
@@ -23,11 +25,18 @@ export class CloudPlayer implements Player {
   private paused = false;
   private rate = 1;
   private parts: { content: string; depth: number }[] = [];
-  private attempts = 0;
-  private synthesisMs = 0;
+  private budget: Budget = { attempts: 0, ms: 0 };
+  private ahead: {
+    content: string;
+    index: number;
+    part?: { content: string; depth: number };
+    budget: Budget;
+    result: Promise<Prepared>;
+    clip?: Clip;
+  } | null = null;
   private recovering = false;
   private pending = false;
-  private cancelWait: (() => void) | null = null;
+  private cancelWait = new Set<() => void>();
   constructor(
     private readonly synthesize: (content: string) => Promise<Clip>,
     private readonly split?: (content: string) => string[],
@@ -52,28 +61,31 @@ export class CloudPlayer implements Player {
   private prepareSegment(): void {
     const content = this.chunks[this.index];
     this.parts = content === undefined ? [] : [{ content, depth: 0 }];
-    this.attempts = 0;
-    this.synthesisMs = 0;
+    this.budget = { attempts: 0, ms: 0 };
     this.recovering = false;
   }
   /** Bound waiting without assuming transport cancellation; dispose late clips. */
-  private request(content: string, id: number): Promise<Clip> {
-    const remaining = 60_000 - this.synthesisMs;
-    if (this.attempts >= 32 || remaining <= 0)
+  private request(
+    content: string,
+    id: number,
+    budget = this.budget,
+  ): Promise<Clip> {
+    const remaining = 60_000 - budget.ms;
+    if (budget.attempts >= 32 || remaining <= 0)
       return Promise.reject(
         new NarrationError(
           "自動再試行の上限に達しました。現在位置から再試行できます。",
         ),
       );
-    this.attempts++;
+    budget.attempts++;
     const start = Date.now();
     return new Promise((resolve, reject) => {
       let settled = false;
       const finish = () => {
         settled = true;
         window.clearTimeout(timer);
-        this.synthesisMs += Date.now() - start;
-        this.cancelWait = null;
+        budget.ms += Date.now() - start;
+        this.cancelWait.delete(cancel);
       };
       const timer = window.setTimeout(() => {
         finish();
@@ -83,10 +95,11 @@ export class CloudPlayer implements Player {
           ),
         );
       }, remaining);
-      this.cancelWait = () => {
+      const cancel = () => {
         finish();
         reject(new Error("Cancelled"));
       };
+      this.cancelWait.add(cancel);
       void (async () => {
         if (settled || id !== this.generation) throw new Error("Cancelled");
         return this.synthesize(content);
@@ -126,7 +139,21 @@ export class CloudPlayer implements Player {
     this.update("loading", this.recovering ? "文章を短く分けて再試行中…" : "");
     this.pending = true;
     try {
-      const clip = await this.request(part.content, id);
+      const ahead = this.ahead;
+      let clip: Clip;
+      if (
+        ahead &&
+        ahead.index === this.index &&
+        (ahead.part ? ahead.part === part : ahead.content === part.content)
+      ) {
+        this.ahead = null;
+        this.budget = ahead.budget;
+        const result = await ahead.result;
+        if ("error" in result) throw result.error;
+        clip = result.clip;
+      } else {
+        clip = await this.request(part.content, id);
+      }
       if (id === this.generation) this.pending = false;
       if (id !== this.generation) {
         clip.stop();
@@ -160,7 +187,7 @@ export class CloudPlayer implements Player {
         error.code === "sentence-too-long" &&
         this.split &&
         part.depth < 4 &&
-        this.attempts < 32
+        this.budget.attempts < 32
       ) {
         const smaller = this.split(part.content);
         if (smaller.length > 1) {
@@ -185,14 +212,42 @@ export class CloudPlayer implements Player {
   private async play(id: number, clip: Clip): Promise<void> {
     try {
       await clip.play();
-      if (id === this.generation && this.clip === clip && !this.paused)
+      if (id === this.generation && this.clip === clip && !this.paused) {
         this.update("playing");
+        this.prefetch(id);
+      }
     } catch {
       if (id === this.generation && this.clip === clip) {
         this.paused = true;
         this.update("paused", "再開ボタンを押すと音声を再生します。");
       }
     }
+  }
+  /** At most one future fragment; errors surface only when playback reaches it. */
+  private prefetch(id: number): void {
+    if (this.ahead || this.paused || id !== this.generation) return;
+    const content = this.parts[1]?.content ?? this.chunks[this.index + 1];
+    if (content === undefined) return;
+    const budget = this.parts.length > 1 ? this.budget : { attempts: 0, ms: 0 };
+    const slot: NonNullable<CloudPlayer["ahead"]> = {
+      content,
+      index: this.parts.length > 1 ? this.index : this.index + 1,
+      part: this.parts[1],
+      budget,
+      result: Promise.resolve({ error: new Error("Not started") }),
+    };
+    this.ahead = slot;
+    slot.result = this.request(content, id, budget).then(
+      (clip): Prepared => {
+        if (id !== this.generation) {
+          clip.stop();
+          return { error: new Error("Cancelled") };
+        }
+        slot.clip = clip;
+        return { clip };
+      },
+      (error: unknown): Prepared => ({ error }),
+    );
   }
   pause(): void {
     if (!["playing", "loading"].includes(this.snapshot.state)) return;
@@ -209,14 +264,15 @@ export class CloudPlayer implements Player {
   }
   retry(): void {
     if (this.snapshot.state !== "error") return;
-    this.attempts = 0;
-    this.synthesisMs = 0;
+    this.budget = { attempts: 0, ms: 0 };
     this.paused = false;
     void this.next(this.generation);
   }
   stop(): void {
     this.generation++;
-    this.cancelWait?.();
+    for (const cancel of this.cancelWait) cancel();
+    this.ahead?.clip?.stop();
+    this.ahead = null;
     this.pending = false;
     this.parts = [];
     this.clip?.stop();

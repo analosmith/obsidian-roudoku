@@ -18,6 +18,7 @@ import {
   markdownToText,
   ssmlChunks,
   splitSsmlForRetry,
+  spokenText,
 } from "./text";
 import { CloudPlayer } from "./cloud-player";
 import { SystemPlayer, type SpeechPort } from "./system-player";
@@ -185,12 +186,14 @@ export default class Roudoku extends Plugin {
       }
     }
   }
-  readCurrentNote(): void {
+  readCurrentNote(autoplay = true): void {
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
     if (view?.file && view.getMode() === "source") {
       this.startText(
         markdownToText(view.editor.getValue()),
         view.file.basename,
+        false,
+        autoplay,
       );
       return;
     }
@@ -209,7 +212,7 @@ export default class Roudoku extends Plugin {
       new Notice("本文を準備しています。もう一度、再生を押してください。");
       return;
     }
-    this.startText(this.noteText, this.noteFile.basename);
+    this.startText(this.noteText, this.noteFile.basename, false, autoplay);
   }
   replayWithSystem(): void {
     if (this.lastText) this.startText(this.lastText, this.lastTitle, true);
@@ -233,7 +236,12 @@ export default class Roudoku extends Plugin {
         new Notice("設定を保存できませんでした。空き容量を確認してください。"),
     );
   }
-  startText(text: string, title: string, forceSystem = false): void {
+  startText(
+    text: string,
+    title: string,
+    forceSystem = false,
+    autoplay = true,
+  ): void {
     if (!text.trim()) {
       new Notice("読み上げる本文がありません。");
       return;
@@ -289,13 +297,21 @@ export default class Roudoku extends Plugin {
           ),
         splitSsmlForRetry,
       );
-      chunks = ssmlChunks(text, 1800);
+      chunks = ssmlChunks(text, 900);
     } else {
       player = new SystemPlayer(speechPort());
       chunks = chunkText(text, 180);
     }
     const label = provider === "google" ? "Google Cloud" : "標準音声";
-    this.session.start(player, chunks, title, label, this.settings.speed);
+    this.session.start(
+      player,
+      chunks,
+      title,
+      label,
+      this.settings.speed,
+      provider === "google" ? chunks.map(spokenText) : chunks,
+      autoplay,
+    );
   }
 }
 type SettingsRow = {

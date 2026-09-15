@@ -4,7 +4,7 @@ import type { SessionSnapshot } from "./session";
 
 export const PLAYER_VIEW = "roudoku-player";
 const labels = {
-  idle: "ノートを選んで再生",
+  idle: "停止中",
   loading: "音声を準備中",
   playing: "再生中",
   paused: "一時停止中",
@@ -55,7 +55,7 @@ export function mountControls(
         plugin.session.skip(-1),
       );
   const play = iconButton(transport, "play", "再生", () => {
-    if (plugin.session.snapshot.state === "idle") plugin.readCurrentNote();
+    if (!plugin.session.hasContent) plugin.readCurrentNote();
     else plugin.session.toggle();
   });
   play.addClass("roudoku-play");
@@ -100,7 +100,9 @@ export function mountControls(
       : s.state === "paused"
         ? "再開"
         : s.state === "idle"
-          ? "このノートを再生"
+          ? plugin.session.hasContent
+            ? "この位置から再開"
+            : "このノートを再生"
           : s.state === "error" && s.provider === "Google Cloud"
             ? "失敗した位置から再試行"
             : "先頭から再生";
@@ -137,32 +139,135 @@ export class RoudokuPlayerView extends ItemView {
     el.empty();
     el.addClass("roudoku");
     this.unsubscribe = mountControls(el.createDiv(), this.plugin, false);
-    new Setting(el).setName("開いているノート").addButton((b) =>
-      b
-        .setButtonText("読み上げる")
-        .setCta()
-        .onClick(() => this.plugin.readCurrentNote()),
-    );
     new Setting(el)
-      .setName("音声")
-      .setDesc("変更は次の再生から適用します。")
-      .addDropdown((d) =>
-        d
-          .addOptions({ system: "標準音声", google: "Google Cloud" })
-          .setValue(this.plugin.settings.provider)
-          .onChange((value) => {
-            this.plugin.settings.provider =
-              value === "google" ? "google" : "system";
-            this.plugin.persist();
-          }),
+      .setName("開いているノート")
+      .addButton((b) =>
+        b
+          .setButtonText("本文を表示")
+          .onClick(() => this.plugin.readCurrentNote(false)),
+      )
+      .addButton((b) =>
+        b
+          .setButtonText("読み上げる")
+          .setCta()
+          .onClick(() => this.plugin.readCurrentNote()),
       );
+    const voice = new Setting(el)
+      .setName("音声")
+      .setDesc("変更後に読み上げるノートへ適用します。");
+    const buttons: HTMLButtonElement[] = [];
+    const refresh = () =>
+      buttons.forEach((button) => {
+        button.setAttribute(
+          "aria-pressed",
+          String(button.dataset.provider === this.plugin.settings.provider),
+        );
+      });
+    for (const [provider, name] of [
+      ["google", "Google Cloud"],
+      ["system", "標準音声"],
+    ] as const) {
+      voice.addButton((b) => {
+        b.setButtonText(name).onClick(() => {
+          this.plugin.settings.provider = provider;
+          this.plugin.persist();
+          refresh();
+        });
+        b.buttonEl.dataset.provider = provider;
+        buttons.push(b.buttonEl);
+      });
+    }
+    refresh();
+    const transcript = el.createDiv({ cls: "roudoku-transcript" });
+    new Setting(transcript).setName("読み上げ本文").setHeading();
+    transcript.createEl("p", {
+      cls: "roudoku-muted",
+      text: "本文の区間を押すと、そこから再生します。停止しても位置は残ります（アプリを閉じるまで）。",
+    });
+    const navigation = transcript.createDiv({ cls: "roudoku-transcript-nav" });
+    const rows = transcript.createDiv();
+    let page = 0;
+    let currentSegments: readonly string[] | null = null;
+    let rowButtons: HTMLButtonElement[] = [];
+    const pageSize = 60;
+    const render = () => {
+      rows.empty();
+      const segments = this.plugin.session.segments;
+      const offset = page * pageSize;
+      rowButtons = segments
+        .slice(offset, offset + pageSize)
+        .map((text, index) => {
+          const button = rows.createEl("button", {
+            cls: "roudoku-sentence",
+            text: `${offset + index + 1}. ${text}`,
+          });
+          button.addEventListener("click", () =>
+            this.plugin.session.seek(offset + index),
+          );
+          return button;
+        });
+      if (!segments.length)
+        rows.createEl("p", {
+          text: "ノートを読み上げると本文が表示されます。",
+        });
+      back.disabled = page === 0;
+      forward.disabled = offset + pageSize >= segments.length;
+      pageLabel.setText(
+        segments.length
+          ? `${offset + 1}–${Math.min(offset + pageSize, segments.length)} / ${segments.length}`
+          : "",
+      );
+      highlight();
+    };
+    const highlight = () => {
+      const index = this.plugin.session.snapshot.completed;
+      rowButtons.forEach((button, i) =>
+        button.setAttribute(
+          "aria-current",
+          String(page * pageSize + i === index),
+        ),
+      );
+    };
+    const back = iconButton(navigation, "chevron-left", "前の本文", () => {
+      page--;
+      render();
+    });
+    const pageLabel = navigation.createSpan();
+    const forward = iconButton(navigation, "chevron-right", "次の本文", () => {
+      page++;
+      render();
+    });
+    iconButton(navigation, "locate", "再生位置を表示", () => {
+      page = Math.floor(
+        Math.min(
+          this.plugin.session.snapshot.completed,
+          Math.max(0, this.plugin.session.segments.length - 1),
+        ) / pageSize,
+      );
+      render();
+      rowButtons
+        .find((b) => b.getAttribute("aria-current") === "true")
+        ?.scrollIntoView({ block: "nearest" });
+    });
+    const unsubscribeControls = this.unsubscribe;
+    const unsubscribeText = this.plugin.session.subscribe(() => {
+      if (currentSegments !== this.plugin.session.segments) {
+        currentSegments = this.plugin.session.segments;
+        page = 0;
+        render();
+      } else highlight();
+    });
+    this.unsubscribe = () => {
+      unsubscribeControls?.();
+      unsubscribeText();
+    };
     el.createEl("p", {
       cls: "roudoku-muted",
       text: "閉じても再生は続きます。下部バーのノート名を押すと、この画面に戻れます。",
     });
     el.createEl("p", {
       cls: "roudoku-muted",
-      text: "進捗は読み終えた区間数です。区間送りはその区間から再生します。Googleでは再合成のAPI料金が発生します。文の長さで拒否された場合は自動で短く分けて再試行します。",
+      text: "進捗は読み終えた区間数です。区間送りはその区間から再生します。Googleでは先の1区間を生成します。停止して聴かなかった先読み分や、位置変更後の再合成にもAPI料金が発生します。文の長さで拒否された場合は自動で短く分けて再試行します。",
     });
     new Setting(el)
       .setName("接続できないとき")
