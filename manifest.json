@@ -1,7 +1,7 @@
 {
   "id": "roudoku",
   "name": "Roudoku",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "minAppVersion": "1.11.5",
   "description": "Read Japanese notes aloud with Google Cloud text-to-speech, a sidebar player, and device speech fallback.",
   "author": "TAKE",

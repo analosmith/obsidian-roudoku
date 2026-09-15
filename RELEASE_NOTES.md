@@ -1,9 +1,10 @@
-Roudoku 0.0.7 addresses the community automated review findings.
+Roudoku 0.0.8 improves everyday playback.
 
-- Settings can be found through Obsidian's settings search on 1.13 and later. Earlier supported versions retain the settings page.
-- The mini-player now manages its workspace state explicitly. CSS no longer uses `:has` or `!important` to reserve reading space.
-- Releases are built and tested in GitHub Actions. Build provenance is generated and verified for `main.js`, `manifest.json`, and `styles.css` before publication.
+- Prepare one future audio segment during playback to reduce generation gaps.
+- Replace the provider dropdown with Google Cloud / device speech buttons.
+- Preview the processed note without synthesis, click a segment to start there, and retain the stopped position during the session.
+- Highlight the current segment and paginate long transcripts.
 
-Google Cloud remains the only supported cloud provider, with device speech as a fallback. The narration and long-sentence recovery behavior is unchanged.
+Unused prefetched audio may incur Google API charges. First playback and requests slower than the current segment still involve waiting. Stop/resume operates at segment boundaries; position is not persisted across app restarts.
 
-Tracks [#1](https://github.com/analosmith/obsidian-roudoku/issues/1).
+Validated with 55 automated tests and Mac Obsidian 1.13.7 UI checks. The user has confirmed the improvements work in everyday use.

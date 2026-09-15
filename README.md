@@ -30,7 +30,7 @@ Install **Roudoku** from [the community plugin listing](https://community.obsidi
 1. Enable the Cloud Text-to-Speech API and billing in your Google Cloud project, then create an API key with appropriate API restrictions.
 2. In Obsidian Settings → Roudoku, create or select a SecretStorage entry for your Google API key. Register credentials separately on each device.
 3. Use the connection check to fetch Google's Japanese voice list. This does not synthesize speech or guarantee synthesis will succeed.
-4. Open the player using the waveform ribbon icon or the **プレイヤーを開く** command. Select **Google Cloud**.
+4. Open the player using the waveform ribbon icon or the **プレイヤーを開く** command. Press **Google Cloud**.
 5. Open a note and choose **このノートを読み上げ** from the ribbon or command palette. A sample playback button is also available in Settings → Roudoku.
 
 The default provider is device speech. Choose Google Cloud in the player to use cloud voices.
@@ -43,12 +43,12 @@ On mobile, the player is accessible through Obsidian's standard right sidebar. T
 - The plugin stores the **SecretStorage entry name**, not the API key itself, in plugin settings. Plain-text key storage is not supported.
 - Device speech uses the Web Speech API, preferring locally installed Japanese voices. Availability and offline behavior depend on your OS and installed voices.
 - The plugin does not log note text, raw API error bodies, or API keys.
-- Stopping discards late responses, but cannot cancel charges for requests already sent.
+- Stopping discards late responses and unused prefetched audio, but cannot cancel charges for requests already sent.
 - Previous/next buttons move between text segments and can trigger new synthesis and additional charges. This release has no persistent audio cache.
 
 ## Limitations
 
-Progress is shown in completed segments, not elapsed seconds. Segments are synthesized sequentially, so there may be pauses between them. Device-speech speed changes restart the current segment.
+Progress is shown in completed segments, not elapsed seconds. While a segment plays, one following segment is synthesized ahead. The first segment and slow network responses can still require waiting. Device-speech speed changes restart the current segment.
 
 Screen-lock and background playback are not guaranteed. There is no MP3 export, folder queue, second-based seeking, or support for other cloud providers in this release.
 
@@ -86,3 +86,12 @@ When Google rejects a request because a sentence is too long, Roudoku retries th
 Stopping or changing segments cancels further retries and discards late audio. After a failure, the play button retries the failed fragment without replaying completed fragments. Authentication, quota and other unrelated errors do not trigger sentence splitting.
 
 Validated with 47 automated tests and a Mac playback check; the user also confirmed the fix works. Full long-note playback, Android/iPad and background playback are not comprehensively verified.
+
+
+## 0.0.8 — prefetch and transcript navigation
+
+The player prepares one following audio segment while the current segment plays. Unused prefetched speech is still billable. Prefetch failures are handled when playback reaches that segment; stop and seek discard obsolete audio.
+
+Use **本文を表示** to load the note without synthesizing audio, then press a text segment to play from that point. The current segment is highlighted. **再生位置を表示** returns the transcript to the current position; long notes use pages of 60 segments. Stopping keeps the position in memory until the plugin or app closes, or another note is loaded. Resume starts that segment again, not the exact stopped second.
+
+Cloud and device speech are selected with two buttons, avoiding the native provider dropdown on iPhone. The selection applies when loading or starting a note; it does not replace an existing playback session.
