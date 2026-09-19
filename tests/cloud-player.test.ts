@@ -68,7 +68,7 @@ describe("cloud session lifecycle", () => {
     await flush();
     a.end();
     await flush();
-    expect(make).toHaveBeenCalledTimes(2);
+    expect(make).toHaveBeenCalledTimes(3);
     expect(p.snapshot.total).toBe(1);
     expect(p.snapshot.state).toBe("playing");
   });
@@ -99,4 +99,78 @@ describe("cloud session lifecycle", () => {
 
 beforeEach(() => {
   vi.stubGlobal("window", globalThis);
+});
+
+it("prefetches exactly one clip during playback and consumes it without another request", async () => {
+  const clips = [fakeClip(), fakeClip(), fakeClip()];
+  const make = vi.fn(async (text: string) => clips[Number(text)]!);
+  const p = new CloudPlayer(make);
+  p.start(["0", "1", "2"]);
+  await flush();
+  expect(make.mock.calls.map((c) => c[0])).toEqual(["0", "1"]);
+  expect(clips[1]!.play).not.toHaveBeenCalled();
+  clips[0]!.end();
+  await flush();
+  expect(clips[1]!.play).toHaveBeenCalledOnce();
+  expect(make.mock.calls.map((c) => c[0])).toEqual(["0", "1", "2"]);
+  p.stop();
+  expect(clips[2]!.stop).toHaveBeenCalled();
+});
+it("disposes an in-flight prefetch after stop without autoplay", async () => {
+  const a = fakeClip(),
+    b = fakeClip(),
+    d = deferred<Clip>();
+  const p = new CloudPlayer(
+    vi.fn().mockResolvedValueOnce(a).mockReturnValueOnce(d.promise),
+  );
+  p.start(["a", "b"]);
+  await flush();
+  p.stop();
+  d.resolve(b);
+  await flush();
+  expect(b.stop).toHaveBeenCalled();
+  expect(b.play).not.toHaveBeenCalled();
+});
+it("defers a prefetch error until that segment and allows retry", async () => {
+  const a = fakeClip(),
+    b = fakeClip();
+  const make = vi
+    .fn()
+    .mockResolvedValueOnce(a)
+    .mockRejectedValueOnce(new Error("offline"))
+    .mockResolvedValueOnce(b);
+  const p = new CloudPlayer(make);
+  p.start(["a", "b"]);
+  await flush();
+  expect(p.snapshot.state).toBe("playing");
+  a.end();
+  await flush();
+  expect(p.snapshot.state).toBe("error");
+  p.retry();
+  await flush();
+  expect(b.play).toHaveBeenCalledOnce();
+  p.stop();
+});
+it("keeps future prefetch separate when retrying identical current text", async () => {
+  const a = fakeClip(),
+    future = fakeClip(),
+    retry = fakeClip();
+  const make = vi
+    .fn()
+    .mockResolvedValueOnce(a)
+    .mockResolvedValueOnce(future)
+    .mockResolvedValueOnce(retry);
+  const p = new CloudPlayer(make);
+  p.start(["same", "same"]);
+  await flush();
+  a.error();
+  p.retry();
+  await flush();
+  expect(retry.play).toHaveBeenCalledOnce();
+  expect(future.play).not.toHaveBeenCalled();
+  retry.end();
+  await flush();
+  expect(future.play).toHaveBeenCalledOnce();
+  expect(make).toHaveBeenCalledTimes(3);
+  p.stop();
 });

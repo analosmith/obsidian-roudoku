@@ -36,6 +36,7 @@ it("splits grouped requests, plays all parts in order, keeps original progress",
   expect(request.mock.calls.map((x) => x[0])).toEqual([
     "<speak><s>一。</s><s>二。</s></speak>",
     "<speak><s>一。</s></speak>",
+    "<speak><s>二。</s></speak>",
   ]);
   expect(p.snapshot.completed).toBe(0);
   a.end();
@@ -128,7 +129,7 @@ it("pause suspends recovery requests until resume", async () => {
   expect(request).toHaveBeenCalledOnce();
   p.resume();
   await flush();
-  expect(request).toHaveBeenCalledTimes(2);
+  expect(request).toHaveBeenCalledTimes(3);
   expect(a.play).toHaveBeenCalledOnce();
   p.stop();
 });

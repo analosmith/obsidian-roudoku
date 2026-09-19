@@ -71,7 +71,7 @@ describe("persistent playback session", () => {
     s.skip(-1);
     expect(p.start).toHaveBeenLastCalledWith(["b", "c"]);
   });
-  it("stops and clears the mini player state, even after a late event", () => {
+  it("stops but retains the note and ignores late events", () => {
     const s = new PlaybackSession(),
       p = fake();
     s.start(p, ["a"], "Note", "標準音声", 1);
@@ -79,7 +79,7 @@ describe("persistent playback session", () => {
     s.stop();
     stale({ state: "playing", completed: 0, total: 1, message: "" });
     expect(s.snapshot.state).toBe("idle");
-    expect(s.snapshot.title).toBe("");
+    expect(s.snapshot.title).toBe("Note");
     s.skip(1);
     expect(p.start).toHaveBeenCalledOnce();
   });
@@ -99,4 +99,30 @@ it("routes the error play button to the current fragment retry", () => {
   expect(player.retry).toHaveBeenCalledOnce();
   expect(player.start).toHaveBeenCalledOnce();
   expect(session.snapshot.completed).toBe(1);
+});
+it("previews without synthesis, seeks and resumes the stopped position", () => {
+  const s = new PlaybackSession(),
+    p = fake();
+  s.start(
+    p,
+    ["a", "b", "c"],
+    "note",
+    "Google Cloud",
+    1,
+    ["甲", "乙", "丙"],
+    false,
+  );
+  expect(p.start).not.toHaveBeenCalled();
+  expect(s.segments).toEqual(["甲", "乙", "丙"]);
+  s.seek(1);
+  expect(p.start).toHaveBeenLastCalledWith(["b", "c"]);
+  s.stop();
+  s.toggle();
+  expect(p.start).toHaveBeenLastCalledWith(["b", "c"]);
+  const count = vi.mocked(p.start).mock.calls.length;
+  s.seek(-1);
+  s.seek(3);
+  s.seek(NaN);
+  s.seek(1.5);
+  expect(p.start).toHaveBeenCalledTimes(count);
 });
