@@ -1,10 +1,7 @@
-Roudoku 0.0.8 improves everyday playback.
+Roudoku 0.0.9 refreshes the public documentation for Japanese Obsidian users.
 
-- Prepare one future audio segment during playback to reduce generation gaps.
-- Replace the provider dropdown with Google Cloud / device speech buttons.
-- Preview the processed note without synthesis, click a segment to start there, and retain the stopped position during the session.
-- Highlight the current segment and paginate long transcripts.
+- Rewrite the README in Japanese around the core mobile use case: listening to saved articles and notes on iPhone.
+- Add iPhone and Mac screenshots showing the full player, compact playback bar, and transcript navigation.
+- Explain Roudoku's Japanese text processing, long-sentence recovery, privacy, costs, setup, and current limitations in plain language.
 
-Unused prefetched audio may incur Google API charges. First playback and requests slower than the current segment still involve waiting. Stop/resume operates at segment boundaries; position is not persisted across app restarts.
-
-Validated with 55 automated tests and Mac Obsidian 1.13.7 UI checks. The user has confirmed the improvements work in everyday use.
+The playback implementation is unchanged from 0.0.8. This release updates the public documentation and makes it available from the Obsidian community plugin listing.
