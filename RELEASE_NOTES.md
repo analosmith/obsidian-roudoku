@@ -1,7 +1,7 @@
-Roudoku 0.0.9 refreshes the public documentation for Japanese Obsidian users.
+Roudoku 0.0.10 updates text segmentation and adds an optional link to VaultCast.
 
-- Rewrite the README in Japanese around the core mobile use case: listening to saved articles and notes on iPhone.
-- Add iPhone and Mac screenshots showing the full player, compact playback bar, and transcript navigation.
-- Explain Roudoku's Japanese text processing, long-sentence recovery, privacy, costs, setup, and current limitations in plain language.
+- Avoid treating decimal points and common abbreviations as sentence boundaries.
+- Prefer commas when splitting a long sentence while preserving text and request size limits.
+- Add a link in settings to VaultCast, an iOS app by the same author. VaultCast supports free use with your own API key; API charges may apply separately.
 
-The playback implementation is unchanged from 0.0.8. This release updates the public documentation and makes it available from the Obsidian community plugin listing.
+Roudoku remains free and does not require VaultCast.

@@ -91,3 +91,18 @@ it("keeps SSML sentence elements separate and caps long unpunctuated sentences",
     .replaceAll("&amp;", "&");
   expect(restored).toBe(text);
 });
+
+it("keeps decimal points, domains and abbreviations inside a sentence", () => {
+  const text = "価格は1.5ドル。Mr. SmithはNode.jsを使う。次です。";
+  const xml = ssmlChunks(text, 900).join("");
+  expect(xml).toContain("<s>価格は1.5ドル。</s>");
+  expect(xml).toContain("<s>Mr. SmithはNode.jsを使う。</s>");
+});
+
+it("prefers commas for long sentences without splitting grouped numbers", () => {
+  const text = "あ".repeat(25) + "、" + "価格は2,300円で" + "い".repeat(30);
+  const chunks = chunkText(text, 40);
+  expect(chunks[0]).toBe("あ".repeat(25) + "、");
+  expect(chunks.join("")).toBe(text);
+  expect(chunks.every((c) => c.length <= 40)).toBe(true);
+});

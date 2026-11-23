@@ -3,6 +3,7 @@ import type { App, Setting, SettingDefinitionRender } from "obsidian";
 const state = vi.hoisted(() => ({ rows: [] as any[] }));
 vi.mock("obsidian", () => {
   class SettingMock {
+    descEl = { createEl: vi.fn() };
     name = "";
     desc = "";
     change?: (value: string) => void;
@@ -82,7 +83,7 @@ it("indexes settings without reading secrets, building UI or calling APIs", () =
   expect(defs.map((d) => ("name" in d ? d.name : ""))).toContain(
     "GoogleのAPIキー",
   );
-  expect(defs).toHaveLength(7);
+  expect(defs).toHaveLength(8);
   expect(state.rows).toHaveLength(0);
 });
 it("renders the same searchable rows in legacy display and keeps controls working", () => {
@@ -107,5 +108,21 @@ it("renders modern definitions without relying on the legacy container", () => {
   for (const def of tab.getSettingDefinitions() as SettingDefinitionRender[]) {
     def.render(new SettingClass({} as HTMLElement) as Setting, {} as never);
   }
-  expect(state.rows).toHaveLength(7);
+  expect(state.rows).toHaveLength(8);
+});
+
+it("shows a static VaultCast link only at the end of settings", () => {
+  const { tab } = create();
+  tab.display();
+  const row = state.rows.at(-1);
+  expect(row.name).toBe("同じ作者のアプリ");
+  expect(row.desc).toContain("無料で使え");
+  expect(row.desc).toContain("Google Cloud APIキー");
+  expect(row.desc).toContain("API利用料は別途");
+  expect(row.desc).toContain("買い切り");
+  expect(row.descEl.createEl).toHaveBeenCalledWith("a", {
+    text: "VaultCastのページを開く",
+    href: "https://vaultcast.analosmith.com/",
+    cls: "external-link",
+  });
 });
