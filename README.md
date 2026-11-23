@@ -142,6 +142,8 @@ Roudoku is a free Obsidian plugin for listening to Japanese Markdown notes. It c
 
 It supports Google Cloud Text-to-Speech and device speech. Google Cloud is BYOK: usage is billed to your own project, and credentials are stored with Obsidian SecretStorage. There is no plugin-operated server, telemetry, or analytics.
 
+The settings screen includes one link to VaultCast, a separate iOS app by the same author for listening to notes from an Obsidian vault on iPhone, including while locked. VaultCast is free to use and supports your own Google Cloud API key (Google API charges may apply separately). A ¥1,500 one-time in-app purchase is also available for those who prefer not to set up an API key. Roudoku remains free and all its features work without VaultCast.
+
 Requires Obsidian 1.11.5 or later. See the Japanese sections above for setup, privacy, costs, and current limitations.
 
 </details>
@@ -158,6 +160,17 @@ npm run package
 ```
 
 `npm run package` はソースを検証し、`dist/roudoku/` とZIPアーカイブへ配布物を生成します。GitHub Releaseのタグは `manifest.json` のバージョンと一致させ、`main.js`、`manifest.json`、`styles.css` の3ファイルを個別に添付します。
+
+## 同じ作者のiOSアプリについて
+
+このプラグインの設定画面には、同じ作者のiOSアプリ「VaultCast」へのリンクを1つ置いています。
+VaultCastは、ObsidianのVaultを選んで、ノートをiPhoneで聴くための別のアプリです。
+ロック中も聴けます。
+
+VaultCastは無料で使え、自分のGoogle Cloud APIキーも利用できます。
+Google CloudのAPI利用料は別途かかります。
+APIキーの設定が難しい方向けに、アプリ内で買い切り（¥1,500）も用意しています。
+Roudokuは引き続き無料で、VaultCastを使わなくてもすべての機能を使えます。
 
 ## ライセンスとクレジット
 

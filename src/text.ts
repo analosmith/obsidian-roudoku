@@ -51,9 +51,49 @@ export function markdownToText(markdown: string): string {
     .trim();
 }
 
-/** The match alternatives cover all characters, including leading punctuation. */
+// Preserve every character while avoiding periods inside numbers and abbreviations.
 function sentences(text: string): string[] {
-  return text.match(/[\s\S]*?[。！？.!?\n]+[」）】』〕”’]*|[\s\S]+$/gu) ?? [];
+  const points = Array.from(text);
+  const abbreviations = new Set(
+    "mr mrs ms dr prof st sr jr vs e.g i.e inc ltd co corp u.s u.k a.m p.m approx dept est".split(
+      " ",
+    ),
+  );
+  const numberAbbreviations = new Set("no fig vol ch sec p pp".split(" "));
+  const result: string[] = [];
+  let start = 0;
+  for (let i = 0; i < points.length; i++) {
+    const c = points[i] ?? "";
+    if (!/[。！？.!?．\n]/u.test(c)) continue;
+    if (c === "." || c === "．") {
+      const next = points[i + 1] ?? "";
+      if (/[a-zA-Z0-9０-９]/u.test(next) && next) continue;
+      let j = i;
+      while (j > 0 && /[a-zA-Z.]/u.test(points[j - 1] ?? "")) j--;
+      const word = points
+        .slice(j, i)
+        .join("")
+        .toLowerCase()
+        .replace(/^\.+|\.+$/g, "");
+      if (abbreviations.has(word)) continue;
+      if (
+        numberAbbreviations.has(word) &&
+        /^[ ]*[0-9０-９]/u.test(points.slice(i + 1).join(""))
+      )
+        continue;
+    }
+    let end = i + 1;
+    while (
+      end < points.length &&
+      /[。！？.!?．\n」）】』〕”’]/u.test(points[end] ?? "")
+    )
+      end++;
+    result.push(points.slice(start, end).join(""));
+    start = end;
+    i = end - 1;
+  }
+  if (start < points.length) result.push(points.slice(start).join(""));
+  return result;
 }
 function bounded(
   text: string,
@@ -77,15 +117,27 @@ function bounded(
       current = sentence;
       continue;
     }
-    // Code-point fallback also works on mobile versions without Intl.Segmenter.
-    for (const point of sentence) {
+    // Prefer a comma boundary before falling back to individual code points.
+    const points = Array.from(sentence);
+    let lastBreak = 0;
+    for (let i = 0; i < points.length; i++) {
+      const point = points[i] ?? "";
       if (measure(point) > limit)
         throw new Error("Chunk limit cannot hold one character");
-      if (measure(current + point) > limit) {
-        result.push(current);
-        current = "";
+      while (measure(current + point) > limit) {
+        const chars = Array.from(current);
+        const cut = lastBreak || chars.length;
+        result.push(chars.slice(0, cut).join(""));
+        current = chars.slice(cut).join("");
+        lastBreak = 0;
       }
       current += point;
+      const numericComma =
+        point === "," &&
+        /[0-9０-９]/u.test(points[i - 1] ?? "") &&
+        /[0-9０-９]/u.test(points[i + 1] ?? "");
+      if (/[、，,]/u.test(point) && !numericComma)
+        lastBreak = Array.from(current).length;
     }
   }
   if (current) result.push(current);

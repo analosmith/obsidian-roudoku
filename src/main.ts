@@ -474,6 +474,18 @@ export class RoudokuSettings extends PluginSettingTab {
           update();
         },
       },
+      {
+        name: "同じ作者のアプリ",
+        desc: "iPhoneで、Obsidianを開かずに、ロック中もノートを聴きたいときは、同じ作者のiOSアプリ「VaultCast」もあります。無料で使え、ご自身のGoogle Cloud APIキーも利用できます（API利用料は別途）。キーの設定が難しい方向けに、買い切りも用意しています。",
+        render: (setting) => {
+          setting.setHeading();
+          setting.descEl.createEl("a", {
+            text: "VaultCastのページを開く",
+            href: "https://vaultcast.analosmith.com/",
+            cls: "external-link",
+          });
+        },
+      },
     ];
   }
 }
